@@ -12,6 +12,8 @@ target/
 .settings
 .springBeans
 .sts4-cache
+effective-pom.xml
+
 
 ### IntelliJ IDEA ###
 .idea

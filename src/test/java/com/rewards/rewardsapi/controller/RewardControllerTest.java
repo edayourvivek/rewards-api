@@ -1,38 +1,34 @@
 package com.rewards.rewardsapi.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 class RewardControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final MockMvc mockMvc;
 
-    @Test
-    void getRewardsShouldReturn200AndJson() throws Exception {
-        mockMvc.perform(get("/api/rewards"))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(content().contentType("application/json"))
-                .andExpect(jsonPath("$").isArray());
+    RewardControllerTest(MockMvc mockMvc) {
+        this.mockMvc = mockMvc;
     }
 
-    /*@Test
-    void getRewardsShouldReturn400WhenNegativeTransactionExists() throws Exception {
-        mockMvc.perform(get("/api/rewards"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Bad Request"))
-                .andExpect(jsonPath("$.message").value("Transaction amount cannot be negative"));
-    }*/
+    @Test
+    void getRewards_shouldReturnRewardsSummary() throws Exception {
 
+        mockMvc.perform(get("/api/rewards"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].customerId").exists())
+                .andExpect(jsonPath("$[0].monthlyReward").isArray())
+                .andExpect(jsonPath("$[0].totalPoints").exists());
+    }
 }

@@ -4,13 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class RewardSummary {
     private String customerId;
-    private Map<String, Integer> monthlyPoints;
+    private List<MonthlyReward> monthlyReward;
     private int totalPoints;
 }

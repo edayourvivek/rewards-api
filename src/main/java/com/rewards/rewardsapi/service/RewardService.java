@@ -1,64 +1,120 @@
 package com.rewards.rewardsapi.service;
 
+import com.rewards.rewardsapi.model.MonthlyAccumulator;
+import com.rewards.rewardsapi.model.MonthlyReward;
 import com.rewards.rewardsapi.model.RewardSummary;
 import com.rewards.rewardsapi.model.Transaction;
+import com.rewards.rewardsapi.repository.TransactionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.Month;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.*;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class RewardService {
 
-    public int calculatePoints(double amount) {
+    private final TransactionRepository transactionRepository;
 
-        if (amount < 0) {
+    public int calculatePoints(BigDecimal amount) {
+
+        if (amount == null) {
+            throw new IllegalArgumentException("Transaction amount cannot be null");
+        }
+
+        if (amount.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Transaction amount cannot be negative");
         }
 
-        if (amount > 100) {
-            return (int) ((amount - 100) * 2 + 50); // 2 points over 100 + 1 point for 50–100
-        } else if (amount > 50) {
-            return (int) (amount - 50); // 1 point over 50
+        if (amount.compareTo(BigDecimal.valueOf(100)) > 0) {
+            return amount
+                    .subtract(BigDecimal.valueOf(100))
+                    .multiply(BigDecimal.valueOf(2))
+                    .add(BigDecimal.valueOf(50))
+                    .intValue();
         }
+
+        if (amount.compareTo(BigDecimal.valueOf(50)) > 0) {
+            return amount
+                    .subtract(BigDecimal.valueOf(50))
+                    .intValue();
+        }
+
         return 0;
     }
 
-    public List<RewardSummary> calculateRewards(List<Transaction> transactions) {
 
-        // customer -> (monthName -> points)
-        Map<String, Map<String, Integer>> customerMonthly = new HashMap<>();
+    public List<RewardSummary> calculateRewards() {
+        Map<String, Map<YearMonth, MonthlyAccumulator>> data = new HashMap<>();
 
+        LocalDate cutoffDate = LocalDate.now().minusMonths(3);
+
+        log.info("Starting reward calculation. Cutoff date: {}", cutoffDate);
+
+        List<Transaction> transactions =
+                transactionRepository.findByDateAfter(cutoffDate);
+
+        log.info("Fetched {} transactions from database", transactions.size());
+
+        if (transactions.isEmpty()) {
+            return Collections.emptyList();
+        }
         for (Transaction tx : transactions) {
+
+            if (tx.getDate() == null || tx.getAmount() == null) {
+                continue;
+            }
+
+
             int points = calculatePoints(tx.getAmount());
-            if (points == 0) continue;
+            YearMonth ym = YearMonth.from(tx.getDate());
 
-            String customerId = tx.getCustomerId();
-            Month month = tx.getDate().getMonth();
-            String monthKey = month.toString();
+            data.computeIfAbsent(tx.getCustomerId(), k -> new HashMap<>())
+                    .computeIfAbsent(ym, k -> new MonthlyAccumulator());
 
-            Map<String, Integer> monthlyMap =
-                    customerMonthly.computeIfAbsent(customerId, k -> new HashMap<>());
+            MonthlyAccumulator acc = data.get(tx.getCustomerId()).get(ym);
 
-            monthlyMap.merge(monthKey, points, Integer::sum);
+            acc.points += points;
+            acc.totalAmount = acc.totalAmount.add(tx.getAmount());
         }
 
-        List<RewardSummary> result = new ArrayList<>();
+        List<RewardSummary> response = new ArrayList<>();
 
-        for (Map.Entry<String, Map<String, Integer>> entry : customerMonthly.entrySet()) {
-            String customerId = entry.getKey();
-            Map<String, Integer> monthlyPoints = entry.getValue();
+        for (var customerEntry : data.entrySet()) {
 
-            int total = monthlyPoints.values().stream().mapToInt(Integer::intValue).sum();
+            List<MonthlyReward> monthly = new ArrayList<>();
+            int totalPoints = 0;
+
+            for (var monthEntry : customerEntry.getValue().entrySet()) {
+                YearMonth ym = monthEntry.getKey();
+                MonthlyAccumulator acc = monthEntry.getValue();
+
+                monthly.add(new MonthlyReward(
+                        ym.getYear(),
+                        ym.getMonth().name(),
+                        acc.totalAmount,
+                        acc.points
+                ));
+
+                totalPoints += acc.points;
+            }
 
             RewardSummary summary = new RewardSummary();
-            summary.setCustomerId(customerId);
-            summary.setMonthlyPoints(monthlyPoints);
-            summary.setTotalPoints(total);
+            summary.setCustomerId(customerEntry.getKey());
+            summary.setMonthlyReward(monthly);
+            summary.setTotalPoints(totalPoints);
 
-            result.add(summary);
+            response.add(summary);
         }
 
-        return result;
+        log.info("Reward calculation completed for {} customers", response.size());
+
+        return response;
     }
+
 }
