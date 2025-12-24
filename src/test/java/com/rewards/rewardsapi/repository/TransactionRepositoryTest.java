@@ -1,7 +1,6 @@
 package com.rewards.rewardsapi.repository;
 
 import com.rewards.rewardsapi.model.Transaction;
-import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -28,7 +27,6 @@ class TransactionRepositoryTest {
         assertNotNull(transactions);
         assertFalse(transactions.isEmpty());
 
-        // verify all returned records satisfy the condition
         transactions.forEach(tx ->
                 assertTrue(tx.getDate().isAfter(cutoffDate))
         );

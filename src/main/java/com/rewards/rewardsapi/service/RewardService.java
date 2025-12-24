@@ -50,26 +50,42 @@ public class RewardService {
 
 
     public List<RewardSummary> calculateRewards() {
-        Map<String, Map<YearMonth, MonthlyAccumulator>> data = new HashMap<>();
 
+        List<Transaction> transactions = fetchRecentTransactions();
+        if (transactions.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, Map<YearMonth, MonthlyAccumulator>> data =
+                accumulateRewards(transactions);
+
+        log.info("Reward calculation completed for {} customers", data.size());
+
+        return buildResponse(data);
+    }
+
+
+    private List<Transaction> fetchRecentTransactions() {
         LocalDate cutoffDate = LocalDate.now().minusMonths(3);
-
         log.info("Starting reward calculation. Cutoff date: {}", cutoffDate);
 
         List<Transaction> transactions =
                 transactionRepository.findByDateAfter(cutoffDate);
 
         log.info("Fetched {} transactions from database", transactions.size());
+        return transactions;
+    }
 
-        if (transactions.isEmpty()) {
-            return Collections.emptyList();
-        }
+    private Map<String, Map<YearMonth, MonthlyAccumulator>>
+    accumulateRewards(List<Transaction> transactions) {
+
+        Map<String, Map<YearMonth, MonthlyAccumulator>> data = new HashMap<>();
+
         for (Transaction tx : transactions) {
 
-            if (tx.getDate() == null || tx.getAmount() == null) {
+            if (tx.getDate() == null || tx.getAmount() == null || tx.getCustomerId() == null) {
                 continue;
             }
-
 
             int points = calculatePoints(tx.getAmount());
             YearMonth ym = YearMonth.from(tx.getDate());
@@ -82,6 +98,12 @@ public class RewardService {
             acc.points += points;
             acc.totalAmount = acc.totalAmount.add(tx.getAmount());
         }
+
+        return data;
+    }
+
+    private List<RewardSummary> buildResponse(
+            Map<String, Map<YearMonth, MonthlyAccumulator>> data) {
 
         List<RewardSummary> response = new ArrayList<>();
 
@@ -112,9 +134,8 @@ public class RewardService {
             response.add(summary);
         }
 
-        log.info("Reward calculation completed for {} customers", response.size());
-
         return response;
     }
+
 
 }

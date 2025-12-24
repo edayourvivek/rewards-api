@@ -34,4 +34,25 @@ A $120 transaction earns:
 ---
 
 ## API Endpoint
-/api/rewards
+
+- **GET** `/api/rewards`  
+  Returns reward points aggregated per customer and per month for the last three months.
+
+
+## Assumptions
+
+- Rewards are calculated for transactions within the last **3 months** from the current date.
+- Transactions with missing `customerId`, `amount`, or `date` are **ignored** during reward calculation.
+- Reward points are calculated per transaction and then aggregated monthly and per customer.
+
+## How to Run
+
+### Run the application
+```bash
+./mvnw spring-boot:run
+````
+### Run test
+```bash
+./mvnw test
+```
+
